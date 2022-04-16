@@ -137,3 +137,4 @@ dmypy.json
 *.png
 *.xls
 *.xlsx
+parser-settings.ini
