@@ -5,12 +5,11 @@
 # Run this (and compiled exe) from same directory as SHAFT.OUT
 
 import os
-import csv
+from csv import reader, writer
 import configparser
 from math import pi
 from scipy.interpolate import interp1d
-import matplotlib
-from matplotlib.collections import PatchCollection
+from matplotlib.collections import PatchCollection, cm
 from matplotlib import pyplot as plt
 from matplotlib.patches import Polygon
 
@@ -65,7 +64,7 @@ def read_data():
     # open and read in output file
     with open('SHAFT.OUT', "r") as file:
         data = [x.replace('\0', '') for x in file]
-        csvreader = csv.reader(data, delimiter='\t')
+        csvreader = reader(data, delimiter='\t')
         for row in csvreader:
     
             try:
@@ -189,7 +188,7 @@ def read_data():
     output = []
     bs =  beam_forces[0][2] / 1000 / model[0][8] / 1000
     output.append([nodes[0][0], nodes[0][1], disps[0][1]*1000, disps[0][2]*1000,
-                   beam_forces[0][2]/1000, beam_forces[0][3]/1000], bs])
+                   beam_forces[0][2]/1000, beam_forces[0][3]/1000, bs])
     for i in range(1, len(nodes)):
         bs =  -beam_forces[2*i-1][2] / 1000 / model[i-1][8] / 1000
         output.append([nodes[i][0], nodes[i][1], disps[i][1]*1000,
@@ -244,7 +243,7 @@ def output_csv(filename, model, output, brgs, inf):
     # Output all data to CSV
 
     csvfile = open(filename, "w", newline="")
-    f = csv.writer(csvfile)
+    f = writer(csvfile)
 
     ##############################################
     # write model
@@ -379,7 +378,7 @@ def create_model_plot(filename, model, output, brgs):
         elements.append(polygon)
 
     # Assign elements to be plot and colors
-    p = PatchCollection(elements, cmap=matplotlib.cm.jet, alpha=0.4)
+    p = PatchCollection(elements, cmap=cm.jet, alpha=0.4)
     p.set_edgecolor('black')
     p.set_facecolor(None)
 

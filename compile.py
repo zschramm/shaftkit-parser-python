@@ -3,7 +3,7 @@ import PyInstaller.__main__
 
 # run pyinstaller
 PyInstaller.__main__.run([
-    'shaftkit-parser.py',
+    'parser.py',
     '--onefile',
     #'--windowed',
     '--console',                    # for debugging
@@ -15,8 +15,9 @@ PyInstaller.__main__.run([
     #'--add-data=./data;data',        # include input file folder
     #'--key encryption_key',
     #'--icon=./shaftkit/logo48x48.ico',
-    '--noconfirm'                     # overwrite previous compiles without confirmation
-])
+    '--noconfirm',                     # overwrite previous compiles without confirmation
+    '--upx-dir=C:\\Users\\ZacSchramm\\OneDrive - LamaLo\\scripts\\python\\upx-3.96-win64'
+    ])
 
 
 # # rename to add "__" to beginning of file name for easy finding.  Could also create a link to file??
