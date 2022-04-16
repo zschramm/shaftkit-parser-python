@@ -26,6 +26,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+/scripts
+/share
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -129,8 +131,8 @@ dmypy.json
 .pyre/
 
 # Other files
-.OUT
-.csv
-.png
-.xls
-.xlsx
+*.OUT
+*.csv
+*.png
+*.xls
+*.xlsx
