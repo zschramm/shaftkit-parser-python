@@ -242,7 +242,7 @@ def read_data():
 
     return model, output, brgs, inf, summary
 
-def output_csv(filename, model, output, brgs, inf):
+def output_csv(filename, model, output, brgs, inf, summary):
     # Output all data to CSV
 
     csvfile = open(filename, "w", newline="")
