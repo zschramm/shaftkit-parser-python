@@ -198,18 +198,21 @@ def read_data():
 
     #############################################################
     # Tabulate Sums
-    # Sum of Element Masses
+    # Sum of Element Masses (kg)
     tmass_elems = 0
     for elem in model:
         tmass_elems += elem[7]
     
-    # Sum of Concentrated Masses
+    # Sum of Concentrated Masses (kg)
     tmass_conc = 0
     for mass in conc_masses:
         tmass_conc += mass[2]
     
-    # Sum of Total Model
+    # Sum of Total Model (kg) / (kN)
     tmass = tmass_elems + tmass_conc
+    tweight = tmass * 9.81/1000
+    summary = dict({'Total Element Mass (kg)' : tmass_elems, 'Total Concentrated Mass (kg)' : tmass_conc,
+                    'Total Mass (kg)' : tmass, 'Total Weight (kN)' : tweight})
 
     #############################################################
     # Clean up influence
@@ -238,7 +241,7 @@ def read_data():
 
     # print(brgs)
 
-    return model, output, brgs, inf
+    return model, output, brgs, inf, summary
 
 def output_csv(filename, model, output, brgs, inf):
     # Output all data to CSV
@@ -247,6 +250,18 @@ def output_csv(filename, model, output, brgs, inf):
     f = csv.writer(csvfile)
 
     ##############################################
+    # write su
+    f.writerow(['Model'])
+    f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
+                'rho(kg/m^3)', 'length (m)', 'mass (kg)', 'section modulus (m^3)'])
+    for elem in model:
+        f.writerow(elem)
+
+    f.writerow('')
+    f.writerow('')
+
+
+    #################################################
     # write model
     f.writerow(['Model'])
     f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
@@ -291,7 +306,6 @@ def output_csv(filename, model, output, brgs, inf):
     ##############################################
     csvfile.close()
 # Add mass summary
-# add bending stress
 
 def create_output_plots(fileprefix, output, brgs):
     # Plots of beam output
@@ -463,11 +477,11 @@ if __name__ == "__main__":
     brg_names = read_config(filename)
 
     # read in SHAFT.OUT and config file
-    model, output, brgs, inf = read_data()
+    model, output, brgs, inf, summary= read_data()
 
     # output to csv
     filename = 'parser-output.csv'
-    output_csv(filename, model, output, brgs, inf)
+    output_csv(filename, model, output, brgs, inf, summary)
 
     # create plots
     fileprefix = 'parser-output-'
