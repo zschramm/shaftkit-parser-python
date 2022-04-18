@@ -5,6 +5,7 @@
 # Run this (and compiled exe) from same directory as SHAFT.OUT
 
 import os
+import time
 from csv import reader, writer
 import configparser
 from math import pi
@@ -18,23 +19,31 @@ def read_config(filename):
     # Config file
     global settings
     settings = dict([])
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(allow_no_value=True)
 
     # check if file exists already
     if os.path.isfile(filename):
         # Read in config file
         config.read(filename)
-        settings['brg_names'] = config['settings']['brg_names'].split(',')
+        try:
+            settings['brg_names'] = config['settings']['brg_names'].split(',')
+        except KeyError:
+            settings['brg_names'] = ""
+
+        try:
+            settings['gauge_nodes'] = config['settings']['gauge_nodes'].split(',')
+        except KeyError:
+            settings['gauge_nodes'] = ""
 
     else:
         # create default file
         settings['brg_names'] = 'aft sterntube, fwd. sterntube, aft gear, fwd. gear'
-        config['settings'] = {'brg_names' : settings['brg_names']}
+        settings['gauge_nodes'] = ''
+        config['settings'] = {'brg_names' : settings['brg_names'], 'gauge_nodes' : settings['gauge_nodes']}
         with open(filename, 'w') as config_file:
             config.write(config_file)
             print(f'Created default {filename} file')
         pass
-# add gauge nodes?  then tabulate Shear & BM at gauge locations
 
 def linspace(a, b, n=100):
     # Generate points along range (instead of importing numpy library)
@@ -197,6 +206,10 @@ def read_data():
 
     #############################################################
     # Tabulate Sums
+    # Total nodes and elements
+    telems = len(model)
+    tlength = output[-1][1]
+
     # Sum of Element Masses (kg)
     tmass_elems = 0
     for elem in model:
@@ -210,8 +223,10 @@ def read_data():
     # Sum of Total Model (kg) / (kN)
     tmass = tmass_elems + tmass_conc
     tweight = tmass * 9.81/1000
-    summary = dict({'Total Element Mass (kg)' : tmass_elems, 'Total Concentrated Mass (kg)' : tmass_conc,
-                    'Total Mass (kg)' : tmass, 'Total Weight (kN)' : tweight})
+    summary = dict({'Total Number of Elements' : telems,
+                    'Total Length' : tlength, 'Total Element Mass (kg)' : tmass_elems,
+                    'Total Concentrated Mass (kg)' : tmass_conc, 'Total Mass (kg)' : tmass,
+                    'Total Weight (kN)' : tweight})
 
     #############################################################
     # Clean up influence
@@ -228,9 +243,9 @@ def read_data():
             temp += inf[j][i] * calc_offsets[i]
         calc_reactions.append(straight_reactions[j] - temp)
 
-    if len(settings['brg_names']) < len(conc_springs):
-        print("ERROR: Bearing names in shaftkit-parser.ini file is too short.")
-        settings['brg_names'] = ["ERROR" for x in conc_springs]
+    if len(settings['brg_names']) != len(conc_springs):
+        print("NOTE: Bearing names in shaftkit-parser.ini does not match number of bearings in model, skipping.")
+        settings['brg_names'] = ["N/A" for x in conc_springs]
     
     brgs = []
     for i in range(len(conc_springs)):
@@ -248,17 +263,26 @@ def output_csv(filename, model, output, brgs, inf, summary):
     csvfile = open(filename, "w", newline="")
     f = writer(csvfile)
 
+    f.writerow(['Shaftkit SHAFT.OUT parser'])
+    f.writerow([time.strftime("%Y-%m-%d %H:%M")])
+
     ##############################################
-    # write su
-    f.writerow(['Model'])
-    f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
-                'rho(kg/m^3)', 'length (m)', 'mass (kg)', 'section modulus (m^3)'])
-    for elem in model:
-        f.writerow(elem)
+    # write summary values
+    f.writerow(['Model Summary'])
+    for row in summary.items():
+        f.writerow(row)
 
     f.writerow('')
     f.writerow('')
 
+    ##############################################
+    # write influence
+    f.writerow(['Bearing Influence (kN/mm'])
+    for i in range(len(inf)):
+        f.writerow(inf[i])
+
+    f.writerow('')
+    f.writerow('')
 
     #################################################
     # write model
@@ -294,17 +318,7 @@ def output_csv(filename, model, output, brgs, inf, summary):
     f.writerow('')
 
     ##############################################
-    # write influence
-    f.writerow(['Bearing Influence (kN/mm'])
-    for i in range(len(inf)):
-        f.writerow(inf[i])
-
-    f.writerow('')
-    f.writerow('')
-
-    ##############################################
     csvfile.close()
-# Add mass summary
 
 def create_output_plots(fileprefix, output, brgs):
     # Plots of beam output
@@ -314,8 +328,8 @@ def create_output_plots(fileprefix, output, brgs):
     brgs_zip = list(zip(*brgs))
     
     # Axis lables
-    labels = ['Deflection (mm)', 'Slope (mrad)', 'Shear Force (kN)', 'Bending Moment (kNm)'] #, 'Bending Stress (MPa)']
-    files = ['defl', 'slope', 'shear', 'moment'] #, 'shear']
+    labels = ['Deflection (mm)', 'Slope (mrad)', 'Shear Force (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)']
+    files = ['defl', 'slope', 'shear', 'moment', 'stress']
 
     #############################################
     # display settings for plot
@@ -329,11 +343,16 @@ def create_output_plots(fileprefix, output, brgs):
         list_x_new = linspace(min(data[1]), max(data[1]), 1000)
         list_y_smooth = interp1d(data[1], data[2+j], kind='cubic')
         
-        # Plot displacement points
-        plt.plot(data[1], data[2+j], 'o', color='black')
-    
-        # Plot smooth curve
-        plt.plot(list_x_new, list_y_smooth(list_x_new), '-' , color='black')
+        if files[j] == 'shear':   
+            # Plot points
+            plt.plot(data[1], data[2+j], 'o-', color='black')
+
+        else:
+            # Plot points
+            plt.plot(data[1], data[2+j], 'o', color='black')        
+
+            # Plot smooth curve
+            plt.plot(list_x_new, list_y_smooth(list_x_new), '-' , color='black')
         
         # Plot bearings
         plt.plot(brgs_zip[1], offsets, '^', markersize = 15, color='red')
@@ -356,15 +375,10 @@ def create_output_plots(fileprefix, output, brgs):
 
         # show bearings at zero after 1st plot (deflection)
         offsets = [0 for x in brgs_zip[4]]
-# add bending stress
-# don't smooth shear plot?
 # add bearing names
 
 def create_model_plot(filename, model, output, brgs):
     # Plot model to image file
-
-    # TODO
-
 
     plt.rcParams['figure.figsize'] = [10, 3]
     fig, ax = plt.subplots()
@@ -449,9 +463,9 @@ def create_model_plot(filename, model, output, brgs):
     plt.xlim(0 - model[-1][1] * 1.05, output[-1][1] * 1.05)
     plt.xlabel('Location (m)')
 
-    # TODO make this dynamic
     # y-axis settings
-    plt.ylim(-0.5, 0.5)
+    plt.ylim(-1, 1)
+
 
     ax.add_collection(p)
 
@@ -469,6 +483,8 @@ def create_model_plot(filename, model, output, brgs):
 # arrows for concentrated mass
 # plot title cut off
 # arrows for concentrated masses?
+# add bearing names?
+# add y-axis title
 
 if __name__ == "__main__":
     # read in config file
