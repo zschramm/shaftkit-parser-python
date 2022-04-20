@@ -195,7 +195,7 @@ def read_data():
     # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN), bm (kNm), bs (MPa)]
     # all values left side of element except last value
     output = []
-    bs =  beam_forces[0][2] / 1000 / model[0][8] / 1000
+    bs =  beam_forces[0][3] / 1000 / model[0][8] / 1000
     output.append([nodes[0][0], nodes[0][1], disps[0][1]*1000, disps[0][2]*1000,
                    beam_forces[0][2]/1000, beam_forces[0][3]/1000, bs])
     for i in range(1, len(nodes)):
@@ -336,18 +336,21 @@ def create_output_plots(fileprefix, output, brgs):
     offsets = brgs_zip[4]
     for j in range(len(labels)):
         plt.rcParams['figure.figsize'] = [12, 5]
+        plt.rcParams['figure.autolayout'] = True
         plt.xlim(0, output[-1][1])
         plt.xlabel('Position (m)')
 
-        # Smooth out curve
-        list_x_new = linspace(min(data[1]), max(data[1]), 1000)
-        list_y_smooth = interp1d(data[1], data[2+j], kind='cubic')
+
         
         if files[j] == 'shear':   
             # Plot points
             plt.plot(data[1], data[2+j], 'o-', color='black')
 
         else:
+            # Smooth out curve
+            list_x_new = linspace(min(data[1]), max(data[1]), 1000)
+            list_y_smooth = interp1d(data[1], data[2+j], kind='cubic')
+
             # Plot points
             plt.plot(data[1], data[2+j], 'o', color='black')        
 
@@ -381,6 +384,7 @@ def create_model_plot(filename, model, output, brgs):
     # Plot model to image file
 
     plt.rcParams['figure.figsize'] = [10, 3]
+    plt.rcParams['figure.autolayout'] = True
     fig, ax = plt.subplots()
     elements = []
 
@@ -465,6 +469,7 @@ def create_model_plot(filename, model, output, brgs):
 
     # y-axis settings
     plt.ylim(-1, 1)
+    plt.ylabel('Diameter (m)')
 
 
     ax.add_collection(p)
@@ -484,7 +489,6 @@ def create_model_plot(filename, model, output, brgs):
 # plot title cut off
 # arrows for concentrated masses?
 # add bearing names?
-# add y-axis title
 
 if __name__ == "__main__":
     # read in config file
