@@ -571,7 +571,7 @@ if __name__ == "__main__":
     filename = 'parser-model.png'
     create_model_plot(filename, model, output, brgs)
 
-    print('Success!')
+    print('Finished')
     time.sleep(2.5)
 
 
