@@ -4,6 +4,7 @@
 # Use compile.py script to create exectuable
 # Run this (and compiled exe) from same directory as SHAFT.OUT
 
+from cmath import sqrt
 import os
 import time
 from csv import reader, writer
@@ -13,7 +14,6 @@ from scipy.interpolate import interp1d
 from matplotlib.collections import PatchCollection, cm
 from matplotlib import pyplot as plt
 from matplotlib.patches import Polygon
-
 
 def read_config(filename):
     # Config file
@@ -26,6 +26,11 @@ def read_config(filename):
         # Read in config file
         config.read(filename)
         try:
+            settings['shaft_out_location'] = config['settings']['shaft_out_location']
+        except KeyError:
+            settings['shaft_out_location'] = ""
+
+        try:
             settings['brg_names'] = config['settings']['brg_names'].split(',')
         except KeyError:
             settings['brg_names'] = ""
@@ -37,9 +42,12 @@ def read_config(filename):
 
     else:
         # create default file
+        settings['shaft_out_location'] = ''
         settings['brg_names'] = 'aft sterntube, fwd. sterntube, aft gear, fwd. gear'
         settings['gauge_nodes'] = ''
-        config['settings'] = {'brg_names' : settings['brg_names'], 'gauge_nodes' : settings['gauge_nodes']}
+        config['settings'] = {'shaft_out_location' : settings['shaft_out_location'],
+                              'brg_names' : settings['brg_names'],
+                              'gauge_nodes' : settings['gauge_nodes']}
         with open(filename, 'w') as config_file:
             config.write(config_file)
             print(f'Created default {filename} file')
@@ -52,7 +60,7 @@ def linspace(a, b, n=100):
     diff = (float(b) - a)/(n - 1)
     return [diff * i + a  for i in range(n)]
 
-def read_data():
+def read_data(filename):
     # Read in SHAFT.OUT
 
     ##############################################
@@ -71,133 +79,150 @@ def read_data():
 
     ################################################
     # open and read in output file
-    with open('SHAFT.OUT', "r") as file:
-        data = [x.replace('\0', '') for x in file]
-        csvreader = reader(data, delimiter='\t')
-        for row in csvreader:
+    try:
+        with open(filename, "r") as file:
+            data = [x.replace('\0', '') for x in file]
+            csvreader = reader(data, delimiter='\t')
+            for k, row in enumerate(csvreader):
+        
+                try:
+                    if row[0] == " NODES":
+                        row = next(csvreader)
+                        while row[0] != " ELEMEN DEF":
+                            x = row[0].split()
+                            nodes.append([int(x[0]), float(x[1])])
+                            row = next(csvreader)
+
+                    if row[0] == " BEAM TYPES ":
+                        row = next(csvreader)
+                        while row[0] != " CONC MASS":
+                            x = row[0].split()
+                            elements.append([float(x[0]), float(x[1]), float(x[2]), float(x[3]), float(x[4])])
+                            row = next(csvreader)
+
+                    if row[0] == " CONC MASS":
+                        row = next(csvreader)
+                        while row[0] != " CONC SPRING":
+                            x = row[0].split()
+                            conc_masses.append([int(x[0]), int(x[1]), float(x[2])])
+                            row = next(csvreader)
+
+                    if row[0] == " CONC SPRING":
+                        row = next(csvreader)
+                        while row[0] != " CONC DAMP":
+                            x = row[0].split()
+                            conc_springs.append([int(x[0]), int(x[1]), float(x[2])])
+                            row = next(csvreader)
+
+                    if row[0] == " CONC DAMP":
+                        row = next(csvreader)
+                        while row[0] != " Force No.   Type    Node   DOF":
+                            x = row[0].split()
+                            conc_damps.append([int(x[0]), int(x[1]), float(x[2])])
+                            row = next(csvreader)
+
+                    if row[0] == " Force No.   Type    Node   DOF":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        while row[0] != "           SPRING REACTIONS":
+                            x = row[0].split()
+                            forces.append([int(x[0]), int(x[1]), int(x[2]), int(x[3]), float(x[4])])
+                            row = next(csvreader)
+
+                    if row[0] == "           SPRING REACTIONS":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        while row[0] != "           DISPLACEMENTS":
+                            x = row[0].split()
+                            spring_reacts.append([int(x[0]), int(x[1]), float(x[2])])
+                            row = next(csvreader)
+
+                    if row[0] == "           DISPLACEMENTS":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        while row[0] != "    BEAM FORCES":
+                            x = row[0].split()
+                            disps.append([int(x[0]), float(x[1]), float(x[2])])
+                            row = next(csvreader)
+
+                    if row[0] == "    BEAM FORCES":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        while row[0] != "Bearing Reactions":
+                            x = row[0].split()
+                            beam_forces.append([int(x[0]), int(x[1]), float(x[2]),  float(x[3])])
+                            row = next(csvreader)
+
+                    if row[0] == "Bearing Reactions":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        x = row[0].split()
+                        brg_reacts.append([float(x[0]), float(x[1]), float(x[2])])
+
+                    if row[0] == "Influence Coefficients":
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        row = next(csvreader)
+                        while len(row) != 0:
+                            # Characteres per value (since sometimes no whitespace between)
+                            num = int(len(row[0]) / 10)
+                            skip =  len(row[0]) - 10*num
+                            inf.append([float(row[0][skip+i*10:skip+i*10+10])/1000 for i in range(num)])
+                            row = next(csvreader)
+
+                # if row data exception, continue
+                except Exception as e:
+                    print(f'Line {k} Exception: {e}')
+                    pass
     
-            try:
-                if row[0] == " NODES":
-                    row = next(csvreader)
-                    while row[0] != " ELEMEN DEF":
-                        x = row[0].split()
-                        nodes.append([int(x[0]), float(x[1])])
-                        row = next(csvreader)
-
-                if row[0] == " BEAM TYPES ":
-                    row = next(csvreader)
-                    while row[0] != " CONC MASS":
-                        x = row[0].split()
-                        elements.append([float(x[0]), float(x[1]), float(x[2]), float(x[3]), float(x[4])])
-                        row = next(csvreader)
-
-                if row[0] == " CONC MASS":
-                    row = next(csvreader)
-                    while row[0] != " CONC SPRING":
-                        x = row[0].split()
-                        conc_masses.append([int(x[0]), int(x[1]), float(x[2])])
-                        row = next(csvreader)
-
-                if row[0] == " CONC SPRING":
-                    row = next(csvreader)
-                    while row[0] != " CONC DAMP":
-                        x = row[0].split()
-                        conc_springs.append([int(x[0]), int(x[1]), float(x[2])])
-                        row = next(csvreader)
-
-                if row[0] == " CONC DAMP":
-                    row = next(csvreader)
-                    while row[0] != " Force No.   Type    Node   DOF":
-                        x = row[0].split()
-                        conc_damps.append([int(x[0]), int(x[1]), float(x[2])])
-                        row = next(csvreader)
-
-                if row[0] == " Force No.   Type    Node   DOF":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    while row[0] != "           SPRING REACTIONS":
-                        x = row[0].split()
-                        forces.append([int(x[0]), int(x[1]), int(x[2]), int(x[3]), float(x[4])])
-                        row = next(csvreader)
-
-                if row[0] == "           SPRING REACTIONS":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    while row[0] != "           DISPLACEMENTS":
-                        x = row[0].split()
-                        spring_reacts.append([int(x[0]), int(x[1]), float(x[2])])
-                        row = next(csvreader)
-
-                if row[0] == "           DISPLACEMENTS":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    while row[0] != "    BEAM FORCES":
-                        x = row[0].split()
-                        disps.append([int(x[0]), float(x[1]), float(x[2])])
-                        row = next(csvreader)
-
-                if row[0] == "    BEAM FORCES":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    while row[0] != "Bearing Reactions":
-                        x = row[0].split()
-                        beam_forces.append([int(x[0]), int(x[1]), float(x[2]),  float(x[3])])
-                        row = next(csvreader)
-
-                if row[0] == "Bearing Reactions":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    x = row[0].split()
-                    brg_reacts.append([float(x[0]), float(x[1]), float(x[2])])
-
-                if row[0] == "Influence Coefficients":
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    row = next(csvreader)
-                    while len(row) != 0:
-                        # Characteres per value (since sometimes no whitespace between)
-                        num = int(len(row[0]) / 10)
-                        skip =  len(row[0]) - 10*num
-                        inf.append([float(row[0][skip+i*10:skip+i*10+10])/1000 for i in range(num)])
-                        row = next(csvreader)
-
-            # if exception, continue
-            except:
-                pass
+    # filename exception 
+    except Exception as e:
+        print(e)
+        quit()
+    
 
     ############################################################
-
-    # Assemble model [element num, OD (m), ID (m), E (MPa), G (MPa), rho(kg/m^3), length (m), mass (kg), section modulus (m^3)]
+    # Assemble model [element num, OD (m), ID (m), E (MPa), G (MPa), rho(kg/m^3),
+    #                 length (m), mass (kg), section modulus (m^3), mom. inertia (m^4)]
+    # Start with original read in data
     model = elements.copy()
+
+    # for each line, calculate additional values and add to row
     for i in range(len(elements)):
             length = nodes[i+1][1] - nodes[i][1]
             mass = (elements[i][0]**2 - elements[i][1]**2) * pi / 4 * elements[i][4] * length
-            secmod = pi / 64 * (elements[i][0]**4 - elements[i][1]**4) / (elements[i][0] / 2)
-            model[i] = [i+1, *model[i], length, mass, secmod]
+            inertia = pi / 64 * (elements[i][0]**4 - elements[i][1]**4)
+            secmod = inertia / (elements[i][0] / 2)
+            model[i] = [i+1, *model[i], length, mass, secmod, inertia]
 
     # for v in zip(model):
     #     print (v)
 
     ############################################################
-    # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN), bm (kNm), bs (MPa)]
+    # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN),
+    #                  bm (kNm), bs (MPa)]
     # all values left side of element except last value
     output = []
+ 
+    # first node
     bs =  beam_forces[0][3] / 1000 / model[0][8] / 1000
     output.append([nodes[0][0], nodes[0][1], disps[0][1]*1000, disps[0][2]*1000,
                    beam_forces[0][2]/1000, beam_forces[0][3]/1000, bs])
+    
+    # remainder of nodes
     for i in range(1, len(nodes)):
         bs =  -beam_forces[2*i-1][2] / 1000 / model[i-1][8] / 1000
         output.append([nodes[i][0], nodes[i][1], disps[i][1]*1000,
@@ -234,7 +259,10 @@ def read_data():
     inf = inf[1:]
 
     #############################################################
-    # Bearing details  [node, x (m), stiffness (N/m), offset (mm), reactions (kN), offset (mm), reactions (kN), name]
+    # Bearing details  [node, x (m), offset (mm), reactions (kN),
+    #                   offset (mm), reactions (kN), name, l/d ratio w/ next bearing]
+
+    # Setup offsets and reactions values
     calc_offsets = [output[brg[0]-1][2] for brg in conc_springs]
     calc_reactions = []
     for j in range(len(inf)):
@@ -243,83 +271,112 @@ def read_data():
             temp += inf[j][i] * calc_offsets[i]
         calc_reactions.append(straight_reactions[j] - temp)
 
+    # Bearing Names
     if len(settings['brg_names']) != len(conc_springs):
-        print("NOTE: Bearing names in shaftkit-parser.ini does not match number of bearings in model, skipping.")
+        print("NOTE: Bearing names in shaftkit-parser.ini does not match number of bearings in model, using 'N/A'.")
         settings['brg_names'] = ["N/A" for x in conc_springs]
     
+    # Write to bearing data object
     brgs = []
     for i in range(len(conc_springs)):
-        brgs.append([conc_springs[i][0], nodes[conc_springs[i][0]-1][1], conc_springs[i][2],
-                     straight_reactions[i], calc_offsets[i], calc_reactions[i],
-                     settings['brg_names'][i].strip() ])
+        node = conc_springs[i][0] - 1
 
-    # print(brgs)
+        # Calculate bearing spacing
+        if i < len(conc_springs) - 1:
+            node2 = conc_springs[i+1][0] - 1
+        
+            brg1 = nodes[node][1]
+            brg2 = nodes[node2][1]
+            span = brg2 - brg1
+
+            # Calculate average diameter of span
+            total = 0
+            for j in range(node, node2):
+                total += model[j][6] * model[j][1]**2
+                print(j)
+            print(total)
+            ratio = sqrt(total / span)
+        else:
+            ratio = ""
+
+        brgs.append([conc_springs[i][0], nodes[node][1],
+                     straight_reactions[i], calc_offsets[i], calc_reactions[i],
+                     settings['brg_names'][i].strip(), ratio])
 
     return model, output, brgs, inf, summary
 
 def output_csv(filename, model, output, brgs, inf, summary):
     # Output all data to CSV
 
-    csvfile = open(filename, "w", newline="")
-    f = writer(csvfile)
+    # Will crash if csv file open in excel, so check first
+    try:
+        csvfile = open(filename, "w", newline="")
+        f = writer(csvfile)
 
-    f.writerow(['Shaftkit SHAFT.OUT parser'])
-    f.writerow([time.strftime("%Y-%m-%d %H:%M")])
+        f.writerow(['Shaftkit SHAFT.OUT parser'])
+        f.writerow([time.strftime("%Y-%m-%d %H:%M")])
 
-    ##############################################
-    # write summary values
-    f.writerow(['Model Summary'])
-    for row in summary.items():
-        f.writerow(row)
+        ##############################################
+        # write summary values
+        f.writerow(['Model Summary'])
+        for row in summary.items():
+            f.writerow(row)
 
-    f.writerow('')
-    f.writerow('')
+        f.writerow('')
+        f.writerow('')
 
-    ##############################################
-    # write influence
-    f.writerow(['Bearing Influence (kN/mm'])
-    for i in range(len(inf)):
-        f.writerow(inf[i])
+        ##############################################
+        # write influence
+        f.writerow(['Bearing Influence (kN/mm'])
+        for row in inf:
+            f.writerow(row)
 
-    f.writerow('')
-    f.writerow('')
+        f.writerow('')
+        f.writerow('')
 
-    #################################################
-    # write model
-    f.writerow(['Model'])
-    f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
-                'rho(kg/m^3)', 'length (m)', 'mass (kg)', 'section modulus (m^3)'])
-    for elem in model:
-        f.writerow(elem)
+        #################################################
+        # write model
+        f.writerow(['Model'])
+        f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
+                    'Density (kg/m^3)', 'Length (m)', 'Mass (kg)', 'Sec. Modulus (m^3)',
+                    'Mom. Inertia (m^4)', 'Left x (m)', 'Right x (m)'])
+        x = 0
+        for i, elem in enumerate(model):
+            # Add left and right x coordinate to table
+            elem.append(output[i][1])
+            elem.append(output[i+1][1])
+            f.writerow(elem)
 
-    f.writerow('')
-    f.writerow('')
+        f.writerow('')
+        f.writerow('')
 
-    ##############################################
-    # write output at nodes
-    f.writerow(['Output'])
-    f.writerow(['Node', 'x (m)', 'disp (mm)', 'slope (mrad)',
-                'shear (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)'])
-    for node in output:
-        f.writerow(node)
+        ##############################################
+        # write output at nodes
+        f.writerow(['Output'])
+        f.writerow(['Node', 'x (m)', 'disp (mm)', 'slope (mrad)',
+                    'shear (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)'])
+        for node in output:
+            f.writerow(node)
 
-    f.writerow('')
-    f.writerow('')
+        f.writerow('')
+        f.writerow('')
 
-    ##############################################
-    # write bearings
-    f.writerow(['Bearings'])
-    f.writerow(['Node' , 'x (m)', 'Stiffness (N/m)', 'Straight Reactions (kN)',
-                'Calc Offsets (mm)', 'Calc Reactions (kN)', 'Name'])
-    for brg in brgs:
-        f.writerow(brg)
+        ##############################################
+        # write bearings
+        f.writerow(['Bearings'])
+        f.writerow(['Node' , 'x (m)', 'Straight Reactions (kN)',
+                    'Calc Offsets (mm)', 'Calc Reactions (kN)', 'Name', 'L/D'])
+        for brg in brgs:
+            f.writerow(brg)
 
-    f.writerow('')
-    f.writerow('')
+        f.writerow('')
+        f.writerow('')
 
-    ##############################################
-    csvfile.close()
-
+        ##############################################
+        csvfile.close()
+    except PermissionError:
+        print('Permission Error: Close output .csv file (excel maybe) before running')
+        
 def create_output_plots(fileprefix, output, brgs):
     # Plots of beam output
 
@@ -496,7 +553,11 @@ if __name__ == "__main__":
     brg_names = read_config(filename)
 
     # read in SHAFT.OUT and config file
-    model, output, brgs, inf, summary= read_data()
+    if settings['shaft_out_location'] == '':
+        filename = 'SHAFT.OUT'
+    else:
+        filename = settings['shaft_out_location']
+    model, output, brgs, inf, summary= read_data(filename)
 
     # output to csv
     filename = 'parser-output.csv'
@@ -509,6 +570,9 @@ if __name__ == "__main__":
     # create model graphic
     filename = 'parser-model.png'
     create_model_plot(filename, model, output, brgs)
+
+    print('Success!')
+    time.sleep(2.5)
 
 
 
