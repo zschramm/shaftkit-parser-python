@@ -214,20 +214,25 @@ def read_data(filename):
     ############################################################
     # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN),
     #                  bm (kNm), bs (MPa)]
-    # all values left side of element except last value
+    # all values left side of element except last value (and bending moment in shaftkit is right side)
     output = []
  
     # first node
-    bs =  beam_forces[0][3] / 1000 / model[0][8] / 1000
+    bs =  beam_forces[0][3] /1000 * model[0][1]/2 / model[0][9] / 1000
     output.append([nodes[0][0], nodes[0][1], disps[0][1]*1000, disps[0][2]*1000,
                    beam_forces[0][2]/1000, beam_forces[0][3]/1000, bs])
     
     # remainder of nodes
-    for i in range(1, len(nodes)):
-        bs =  -beam_forces[2*i-1][2] / 1000 / model[i-1][8] / 1000
+    for i in range(1, len(nodes)-1):
+        bs =  beam_forces[2*i-1][3] /1000 * model[i][1]/2 / model[i][9] / 1000
         output.append([nodes[i][0], nodes[i][1], disps[i][1]*1000,
-                       disps[i][2]*1000, -beam_forces[2*i-1][2]/1000,
+                       disps[i][2]*1000, beam_forces[2*i][2]/1000,
                        beam_forces[2*i-1][3]/1000,  bs])
+
+    # last node
+    beam_forces[-1][3] /1000 * model[-1][1]/2 / model[-1][9] / 1000
+    output.append([nodes[-1][0], nodes[-1][1], disps[-1][1]*1000, disps[-1][2]*1000,
+                   beam_forces[-1][2]/1000, beam_forces[-1][3]/1000, bs])
 
     #############################################################
     # Tabulate Sums
@@ -353,8 +358,8 @@ def output_csv(filename, model, output, brgs, inf, summary):
         ##############################################
         # write output at nodes
         f.writerow(['Output'])
-        f.writerow(['Node', 'x (m)', 'disp (mm)', 'slope (mrad)',
-                    'shear (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)'])
+        f.writerow(['Node', 'x (m)', 'Disp (mm)', 'Slope (mrad)',
+                    'Shear (kN) Right End', 'Bending Moment (kNm) Left End', 'Bending Stress (MPa)'])
         for node in output:
             f.writerow(node)
 
@@ -577,4 +582,25 @@ if __name__ == "__main__":
 
 
 
+# Unused code
+# def format_values(item):
+#     # Format numbers to 3 decimal places
+    
+#     str_new = []
+#     for row in item:
+#         new_row = []
+#         for val in row:
+#             try:
+#                 new_row.append("{0:.3f}".format(val))
+#             except ValueError:
+#                 pass
+#         str_new.append(new_row)
 
+#     return str_new
+
+
+    # # Format numbers to 3 decimal places
+    # str_model = format_values(model)
+    # str_output = format_values(output)
+    # str_inf = format_values(inf)
+    # str_brgs = format_values(brgs)
