@@ -395,7 +395,7 @@ def create_output_plots(fileprefix, output, brgs):
 
     #############################################
     # display settings for plot
-    offsets = brgs_zip[4]
+    offsets = brgs_zip[3]
     for j in range(len(labels)):
         plt.rcParams['figure.figsize'] = [12, 5]
         plt.rcParams['figure.autolayout'] = True
