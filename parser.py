@@ -454,7 +454,7 @@ def create_output_plots(fileprefix, output, brgs):
 def create_model_plot(filename, model, output, brgs):
     # Plot model to image file
 
-    plt.rcParams['figure.figsize'] = [10, 3]
+    plt.rcParams['figure.figsize'] = [10, 4]
     plt.rcParams['figure.autolayout'] = True
     fig, ax = plt.subplots()
     elements = []
@@ -538,7 +538,7 @@ def create_model_plot(filename, model, output, brgs):
     plt.xlabel('Location (m)')
 
     # y-axis settings
-    y_max = 2 * y_max
+    y_max = 1.5 * y_max
     plt.ylim(-y_max, y_max)
     plt.ylabel('Diameter (m)')
 
@@ -548,12 +548,12 @@ def create_model_plot(filename, model, output, brgs):
     brg_y = [-model[brg[0]-1][1] for brg in brgs]
     ax.plot(brg_x, brg_y, '^', markersize=10, color='red')
 
-    # Add bearing naming
-    brg_names = [brg[5] for brg in brgs]
-    for i, brg in enumerate(brgs):
-        # vertical plotting position
-        txt = ax.annotate(brg[5],  xy=(brg_x[i], y_max * -0.75), ha='center', size=10, color='gray', wrap=True)
-        txt._get_wrap_line_width = lambda : 50.
+    # # Add bearing naming
+    # brg_names = [brg[5] for brg in brgs]
+    # for i, brg in enumerate(brgs):
+    #     # vertical plotting position
+    #     txt = ax.annotate(brg[5],  xy=(brg_x[i], y_max * -0.75), ha='center', size=10, color='gray', wrap=True)
+    #     txt._get_wrap_line_width = lambda : 50.
 
     ax.add_collection(p)
 
