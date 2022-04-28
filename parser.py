@@ -383,8 +383,6 @@ def output_csv(filename, model, output, brgs, inf, summary):
         print('Permission Error: Close output .csv file (excel maybe) before running')
         
 def create_output_plots(fileprefix, output, brgs):
-    # Plots of beam output
-
     # Transpose lists for plotting
     data = list(zip(*output))
     brgs_zip = list(zip(*brgs))
@@ -393,18 +391,24 @@ def create_output_plots(fileprefix, output, brgs):
     labels = ['Deflection (mm)', 'Slope (mrad)', 'Shear Force (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)']
     files = ['defl', 'slope', 'shear', 'moment', 'stress']
 
-    #############################################
-    # display settings for plot
+    # Bearing offsets for deflection plot
     offsets = brgs_zip[3]
+
+    #############################################
+    # Plot each
     for j in range(len(labels)):
+        
+        # display settings for plot
         plt.rcParams['figure.figsize'] = [12, 5]
         plt.rcParams['figure.autolayout'] = True
-        plt.xlim(0, output[-1][1])
+
+        # Increase x-axis limits by 2% at each end to prevent cropping        
+        length = output[-1][1]
+        plt.xlim(0-length*0.02, output[-1][1]*1.02)
         plt.xlabel('Position (m)')
 
-
         
-        if files[j] == 'shear':   
+        if files[j] == 'shear' or files[j] == 'moment' :   
             # Plot points
             plt.plot(data[1], data[2+j], 'o-', color='black')
 
@@ -418,11 +422,16 @@ def create_output_plots(fileprefix, output, brgs):
 
             # Plot smooth curve
             plt.plot(list_x_new, list_y_smooth(list_x_new), '-' , color='black')
-        
+
+        #####################################################        
         # Plot bearings
         plt.plot(brgs_zip[1], offsets, '^', markersize = 15, color='red')
         plt.ylabel(labels[j])
 
+        # Add bearing names
+
+
+        ######################################################
         # Y axis lable, make larger??
         #fig.text(0.06, 0.5, 'Relative Displacement', ha='center', va='center', rotation='vertical')
 
@@ -449,6 +458,7 @@ def create_model_plot(filename, model, output, brgs):
     plt.rcParams['figure.autolayout'] = True
     fig, ax = plt.subplots()
     elements = []
+    y_max = 0
 
     ##########################################################
     # Plot element properties
@@ -459,6 +469,9 @@ def create_model_plot(filename, model, output, brgs):
         right = output[i+1][1]
         top = model[i][1] / 2
         bottom = -top
+
+        # save max diameter
+        if top > y_max: y_max = top
 
         # Shape to plot
         rect = [[left, top],
@@ -519,23 +532,32 @@ def create_model_plot(filename, model, output, brgs):
     #                 arrowprops=dict(facecolor='black', shrink=0.05),
     #                 horizontalalignment='center', verticalalignment='top')
 
-    # Assign bearings to plot
-    brg_x = [brg[1] for brg in brgs] 
-    brg_y = [-model[brg[0]-1][1]/2 for brg in brgs]
-    ax.plot(brg_x, brg_y, '^', markersize=30, color='red')
-
     ##############################################################
     # x-axis settings
     plt.xlim(0 - model[-1][1] * 1.05, output[-1][1] * 1.05)
     plt.xlabel('Location (m)')
 
     # y-axis settings
-    plt.ylim(-1, 1)
+    y_max = 2 * y_max
+    plt.ylim(-y_max, y_max)
     plt.ylabel('Diameter (m)')
 
+    #############################################################
+    # Assign bearings to plot
+    brg_x = [brg[1] for brg in brgs] 
+    brg_y = [-model[brg[0]-1][1] for brg in brgs]
+    ax.plot(brg_x, brg_y, '^', markersize=10, color='red')
+
+    # Add bearing naming
+    brg_names = [brg[5] for brg in brgs]
+    for i, brg in enumerate(brgs):
+        # vertical plotting position
+        txt = ax.annotate(brg[5],  xy=(brg_x[i], y_max * -0.75), ha='center', size=10, color='gray', wrap=True)
+        txt._get_wrap_line_width = lambda : 50.
 
     ax.add_collection(p)
 
+    ###########################################################
     # save plot
     # old file was not being overwritten without os.remove
     if os.path.isfile(filename):
