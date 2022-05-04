@@ -298,8 +298,6 @@ def read_data(filename):
             total = 0
             for j in range(node, node2):
                 total += model[j][6] * model[j][1]**2
-                print(j)
-            print(total)
             avg_dia = (total / span)**0.5
             ratio = span / avg_dia
         else:
