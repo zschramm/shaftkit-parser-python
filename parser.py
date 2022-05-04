@@ -199,17 +199,17 @@ def read_data(filename):
     #                 length (m), mass (kg), section modulus (m^3), mom. inertia (m^4)]
     # Start with original read in data
     model = elements.copy()
+    x = 0
 
     # for each line, calculate additional values and add to row
     for i in range(len(elements)):
+            left_x = x
             length = nodes[i+1][1] - nodes[i][1]
+            x += length
             mass = (elements[i][0]**2 - elements[i][1]**2) * pi / 4 * elements[i][4] * length
             inertia = pi / 64 * (elements[i][0]**4 - elements[i][1]**4)
             secmod = inertia / (elements[i][0] / 2)
-            model[i] = [i+1, *model[i], length, mass, secmod, inertia]
-
-    # for v in zip(model):
-    #     print (v)
+            model[i] = [i+1, *model[i], length, mass, secmod, inertia, left_x, x]
 
     ############################################################
     # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN),
@@ -311,9 +311,9 @@ def read_data(filename):
                      straight_reactions[i], calc_offsets[i], calc_reactions[i],
                      settings['brg_names'][i].strip(), span, avg_dia, ratio])
 
-    return model, output, brgs, inf, summary
+    return model, output, brgs, inf, summary, conc_masses
 
-def output_csv(filename, model, output, brgs, inf, summary):
+def output_csv(filename, model, output, brgs, inf, summary, conc_mass):
     # Output all data to CSV
 
     # Will crash if csv file open in excel, so check first
@@ -361,11 +361,8 @@ def output_csv(filename, model, output, brgs, inf, summary):
                     'Density (kg/m^3)',  'Mass (kg)', 'E (MPa)', 'G (MPa)',
                     'Sec. Modulus (m^3)', 'Mom. Inertia (m^4)', 'Left x (m)', ])
         x = 0
+        # reformat table order
         for i, elem in enumerate(model):
-            # Add left and right x coordinate to table
-            elem.append(output[i][1])
-            elem.append(output[i+1][1])
-            
             new_elem = [elem[0], elem[11], elem[6], elem[1], elem[2], elem[5],
                         elem[7], elem[3], elem[4], elem[8], elem[9], elem[10]]
             f.writerow(new_elem)
@@ -388,7 +385,8 @@ def output_csv(filename, model, output, brgs, inf, summary):
         csvfile.close()
     except PermissionError:
         print('Permission Error: Close output .csv file (excel maybe) before running')
-        
+# add concentrated masses table   
+
 def create_output_plots(fileprefix, output, brgs):
     # Plots of beam output
 
@@ -447,10 +445,17 @@ def create_output_plots(fileprefix, output, brgs):
         offsets = [0 for x in brgs_zip[4]]
 # add bearing names
 
-def create_model_plot(filename, model, output, brgs):
+def create_model_plot(filename, model, output, brgs, conc_mass):
     # Plot model to image file
 
-    plt.rcParams['figure.figsize'] = [10, 3]
+    # Setup figure size
+    width = 10
+    height = 3
+    dpi = 100
+    scale = width*dpi*0.0125
+
+    plt.rcParams['figure.figsize'] = [width, height]
+    plt.rcParams['figure.dpi'] = dpi
     plt.rcParams['figure.autolayout'] = True
     fig, ax = plt.subplots()
     elements = []
@@ -482,52 +487,33 @@ def create_model_plot(filename, model, output, brgs):
     p.set_facecolor(None)
 
     ##############################################################
-    # Plot node properties
-    # for z in range(0, len(model)):
-    #     #############################################
+    # Plot concentrated masses
+    for mass in conc_mass:
 
+        # Only plot if not node 1, not zero mass, and DOF = 1 (not concentrated inertia)
+        if mass[0] != 0 and mass[2] != 0 and mass[1] == 1:
 
-    #     ##############################################
-    #     # Make list of concentrated masses
-    #     if shaft.nodes[z].concMass != 0:
+            # Location of mass
+            node = mass[0]
 
-    #         # TODO need next named element
-    #         # As long as not the last element, get larger of ODs
-    #         if z != len(shaft.elems) - 1:
-    #             y = max(shaft.elems[z].massOD, shaft.elems[z + 1].massOD) / 2
+            # As long as not the last element, get larger of ODs
+            if node != len(model) - 1:
+                plt_y = max(model[node][1], model[node+1][1])
+            else:
+                plt_y = model[node][1]
 
-    #         else:
-    #             y = shaft.elems[z].massOD
+            # Assign concentrated masses to plot
+            ax.arrow(x = model[node][-2],
+                     y = scale / 5 * plt_y,
+                     dx = 0, dy =  -plt_y * mass[2] / abs(mass[2]) * scale / 25,
+                     width = 0.003 * scale)
 
-    #         # Assign concentrated masses to plot
-    #         ax.annotate(round(shaft.nodes[z].concMass),
-    #                     xy=(shaft.nodes[z].x, y),
-    #                     xycoords='data',
-    #                     xytext=(shaft.nodes[z].x, y * 2),
-    #                     arrowprops=dict(facecolor='black', shrink=0.05),
-    #                     horizontalalignment='center', verticalalignment='top')
-
-    # # Assign first & last node concentrated mass to plot
-    # if shaft.nodes[0].concMass != 0:
-    #     ax.annotate(round(shaft.nodes[0].concMass),
-    #                 xy=(shaft.nodes[0].x, shaft.elems[0].massOD / 2),
-    #                 xycoords='data',
-    #                 xytext=(shaft.nodes[0].x, shaft.elems[0].massOD * 1.25),
-    #                 arrowprops=dict(facecolor='black', shrink=0.05),
-    #                 horizontalalignment='center', verticalalignment='top')
-
-    # if shaft.nodes[z + 1].concMass != 0:
-    #     ax.annotate(round(shaft.nodes[z + 1].concMass),
-    #                 xy=(shaft.nodes[z + 1].x, shaft.elems[z].massOD / 2),
-    #                 xycoords='data',
-    #                 xytext=(shaft.nodes[z + 1].x, shaft.elems[z].massOD * 1.25),
-    #                 arrowprops=dict(facecolor='black', shrink=0.05),
-    #                 horizontalalignment='center', verticalalignment='top')
+    #############################################################
 
     # Assign bearings to plot
     brg_x = [brg[1] for brg in brgs] 
-    brg_y = [-model[brg[0]-1][1]/2 for brg in brgs]
-    ax.plot(brg_x, brg_y, '^', markersize=30, color='red')
+    brg_y = [-model[brg[0]-1][1] for brg in brgs]
+    ax.plot(brg_x, brg_y, '^', markersize=scale, color='red')
 
     ##############################################################
     # x-axis settings
@@ -567,11 +553,12 @@ if __name__ == "__main__":
         filename = 'SHAFT.OUT'
     else:
         filename = settings['shaft_out_location']
-    model, output, brgs, inf, summary= read_data(filename)
+
+    model, output, brgs, inf, summary, conc_mass = read_data(filename)
 
     # output to csv
     filename = 'parser-output.csv'
-    output_csv(filename, model, output, brgs, inf, summary)
+    output_csv(filename, model, output, brgs, inf, summary, conc_mass)
 
     # create plots
     fileprefix = 'parser-output-'
@@ -579,7 +566,7 @@ if __name__ == "__main__":
 
     # create model graphic
     filename = 'parser-model.png'
-    create_model_plot(filename, model, output, brgs)
+    create_model_plot(filename, model, output, brgs, conc_mass)
 
     print('Finished')
     time.sleep(2.5)
