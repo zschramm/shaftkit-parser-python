@@ -476,7 +476,7 @@ def create_model_plot(filename, model, output, brgs, conc_mass):
                 [left, top]]
 
         # Add as polygon
-        polygon = Polygon(rect, True)
+        polygon = Polygon(xy=rect, closed=True)
         elements.append(polygon)
 
     # Assign elements to be plot and colors
