@@ -308,7 +308,7 @@ def read_data(filename):
                      straight_reactions[i], calc_offsets[i], calc_reactions[i],
                      settings['brg_names'][i].strip(), ratio])
 
-    return model, output, brgs, inf, summary
+    return model, output, brgs, inf, summary, conc_masses
 
 def output_csv(filename, model, output, brgs, inf, summary):
     # Output all data to CSV
@@ -451,7 +451,7 @@ def create_output_plots(fileprefix, output, brgs):
         offsets = [0 for x in brgs_zip[4]]
 # add bearing names
 
-def create_model_plot(filename, model, output, brgs):
+def create_model_plot(filename, model, output, brgs, conc_masses):
     # Plot model to image file
 
     plt.rcParams['figure.figsize'] = [10, 4]
@@ -484,53 +484,23 @@ def create_model_plot(filename, model, output, brgs):
         polygon = Polygon(xy=rect, closed=True)
         elements.append(polygon)
 
+    # plot concentrated masses
+    for mass in conc_masses:
+        left = output[mass[0] - 1][1]
+        right = output[mass[0]][1]
+        top = model[mass[0] - 1][1] * 2/3
+        
+        if mass[2] > 0: 
+            ax.annotate("",
+                        xy=(left, top),
+                        xytext = (left, top + 0.25),
+                        arrowprops=dict(facecolor='blue', width = 2.5, headwidth = 7.5, headlength = 5),
+                        horizontalalignment='center', verticalalignment='top')
+
     # Assign elements to be plot and colors
     p = PatchCollection(elements, cmap=cm.jet, alpha=0.4)
     p.set_edgecolor('black')
     p.set_facecolor(None)
-
-    ##############################################################
-    # Plot node properties
-    # for z in range(0, len(model)):
-    #     #############################################
-
-
-    #     ##############################################
-    #     # Make list of concentrated masses
-    #     if shaft.nodes[z].concMass != 0:
-
-    #         # TODO need next named element
-    #         # As long as not the last element, get larger of ODs
-    #         if z != len(shaft.elems) - 1:
-    #             y = max(shaft.elems[z].massOD, shaft.elems[z + 1].massOD) / 2
-
-    #         else:
-    #             y = shaft.elems[z].massOD
-
-    #         # Assign concentrated masses to plot
-    #         ax.annotate(round(shaft.nodes[z].concMass),
-    #                     xy=(shaft.nodes[z].x, y),
-    #                     xycoords='data',
-    #                     xytext=(shaft.nodes[z].x, y * 2),
-    #                     arrowprops=dict(facecolor='black', shrink=0.05),
-    #                     horizontalalignment='center', verticalalignment='top')
-
-    # # Assign first & last node concentrated mass to plot
-    # if shaft.nodes[0].concMass != 0:
-    #     ax.annotate(round(shaft.nodes[0].concMass),
-    #                 xy=(shaft.nodes[0].x, shaft.elems[0].massOD / 2),
-    #                 xycoords='data',
-    #                 xytext=(shaft.nodes[0].x, shaft.elems[0].massOD * 1.25),
-    #                 arrowprops=dict(facecolor='black', shrink=0.05),
-    #                 horizontalalignment='center', verticalalignment='top')
-
-    # if shaft.nodes[z + 1].concMass != 0:
-    #     ax.annotate(round(shaft.nodes[z + 1].concMass),
-    #                 xy=(shaft.nodes[z + 1].x, shaft.elems[z].massOD / 2),
-    #                 xycoords='data',
-    #                 xytext=(shaft.nodes[z + 1].x, shaft.elems[z].massOD * 1.25),
-    #                 arrowprops=dict(facecolor='black', shrink=0.05),
-    #                 horizontalalignment='center', verticalalignment='top')
 
     ##############################################################
     # x-axis settings
@@ -538,7 +508,9 @@ def create_model_plot(filename, model, output, brgs):
     plt.xlabel('Location (m)')
 
     # y-axis settings
-    y_max = 1.5 * y_max
+    if y_max < 1: y_max = 1
+    else: y_max = 1.5 * y_max
+    
     plt.ylim(-y_max, y_max)
     plt.ylabel('Diameter (m)')
 
@@ -584,7 +556,7 @@ if __name__ == "__main__":
         filename = 'SHAFT.OUT'
     else:
         filename = settings['shaft_out_location']
-    model, output, brgs, inf, summary= read_data(filename)
+    model, output, brgs, inf, summary, conc_masses = read_data(filename)
 
     # output to csv
     filename = 'parser-output.csv'
@@ -596,7 +568,7 @@ if __name__ == "__main__":
 
     # create model graphic
     filename = 'parser-model.png'
-    create_model_plot(filename, model, output, brgs)
+    create_model_plot(filename, model, output, brgs, conc_masses)
 
     print('Finished')
     time.sleep(2.5)
