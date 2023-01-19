@@ -410,15 +410,15 @@ def create_output_plots(fileprefix, output, brgs):
         
         if files[j] == 'shear' or files[j] == 'moment' :   
             # Plot points
-            plt.plot(data[1], data[2+j], 'o-', color='black')
+            plt.plot(data[1], data[2+j], '', color='black')
 
         else:
             # Smooth out curve
             list_x_new = linspace(min(data[1]), max(data[1]), 1000)
-            list_y_smooth = interp1d(data[1], data[2+j], kind='cubic')
+            list_y_smooth = interp1d(data[1], data[2+j], kind='slinear')
 
             # Plot points
-            plt.plot(data[1], data[2+j], 'o', color='black')        
+            # plt.plot(data[1], data[2+j], 'o', color='black')        
 
             # Plot smooth curve
             plt.plot(list_x_new, list_y_smooth(list_x_new), '-' , color='black')
