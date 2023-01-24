@@ -199,17 +199,17 @@ def read_data(filename):
     #                 length (m), mass (kg), section modulus (m^3), mom. inertia (m^4)]
     # Start with original read in data
     model = elements.copy()
-    x = 0
 
     # for each line, calculate additional values and add to row
     for i in range(len(elements)):
-            left_x = x
             length = nodes[i+1][1] - nodes[i][1]
-            x += length
             mass = (elements[i][0]**2 - elements[i][1]**2) * pi / 4 * elements[i][4] * length
             inertia = pi / 64 * (elements[i][0]**4 - elements[i][1]**4)
             secmod = inertia / (elements[i][0] / 2)
-            model[i] = [i+1, *model[i], length, mass, secmod, inertia, left_x, x]
+            model[i] = [i+1, *model[i], length, mass, secmod, inertia]
+
+    # for v in zip(model):
+    #     print (v)
 
     ############################################################
     # Assemble output [node num, x (m), disp (mm), slope (mrad), shear (kN),
@@ -298,20 +298,19 @@ def read_data(filename):
             total = 0
             for j in range(node, node2):
                 total += model[j][6] * model[j][1]**2
-            avg_dia = (total / span)**0.5
-            ratio = span / avg_dia
+                print(j)
+            print(total)
+            ratio = sqrt(total / span)
         else:
-            span = ""
-            avg_dia = ""
             ratio = ""
 
         brgs.append([conc_springs[i][0], nodes[node][1],
                      straight_reactions[i], calc_offsets[i], calc_reactions[i],
-                     settings['brg_names'][i].strip(), span, avg_dia, ratio])
+                     settings['brg_names'][i].strip(), ratio])
 
     return model, output, brgs, inf, summary, conc_masses
 
-def output_csv(filename, model, output, brgs, inf, summary, conc_mass):
+def output_csv(filename, model, output, brgs, inf, summary):
     # Output all data to CSV
 
     # Will crash if csv file open in excel, so check first
@@ -332,18 +331,6 @@ def output_csv(filename, model, output, brgs, inf, summary, conc_mass):
         f.writerow('')
 
         ##############################################
-        # write bearings
-        f.writerow(['Bearings'])
-        f.writerow(['Node' , 'x (m)', 'Straight Reactions (kN)',
-                    'Calc Offsets (mm)', 'Calc Reactions (kN)', 'Name', 'Span (m)',
-                    'Avg Dia. (m)', 'L/D'])
-        for brg in brgs:
-            f.writerow(brg)
-
-        f.writerow('')
-        f.writerow('')
-
-        ##############################################
         # write influence
         f.writerow(['Bearing Influence (kN/mm'])
         for row in inf:
@@ -355,15 +342,15 @@ def output_csv(filename, model, output, brgs, inf, summary, conc_mass):
         #################################################
         # write model
         f.writerow(['Model'])
-        f.writerow(['Element' , 'Right x (m)', 'Length (m)', 'OD (m)', 'ID (m)', 
-                    'Density (kg/m^3)',  'Mass (kg)', 'E (MPa)', 'G (MPa)',
-                    'Sec. Modulus (m^3)', 'Mom. Inertia (m^4)', 'Left x (m)', ])
+        f.writerow(['Element' , 'OD (m)', 'ID (m)', 'E (MPa)', 'G (MPa)',
+                    'Density (kg/m^3)', 'Length (m)', 'Mass (kg)', 'Sec. Modulus (m^3)',
+                    'Mom. Inertia (m^4)', 'Left x (m)', 'Right x (m)'])
         x = 0
-        # reformat table order
         for i, elem in enumerate(model):
-            new_elem = [elem[0], elem[11], elem[6], elem[1], elem[2], elem[5],
-                        elem[7], elem[3], elem[4], elem[8], elem[9], elem[10]]
-            f.writerow(new_elem)
+            # Add left and right x coordinate to table
+            elem.append(output[i][1])
+            elem.append(output[i+1][1])
+            f.writerow(elem)
 
         f.writerow('')
         f.writerow('')
@@ -380,14 +367,22 @@ def output_csv(filename, model, output, brgs, inf, summary, conc_mass):
         f.writerow('')
 
         ##############################################
+        # write bearings
+        f.writerow(['Bearings'])
+        f.writerow(['Node' , 'x (m)', 'Straight Reactions (kN)',
+                    'Calc Offsets (mm)', 'Calc Reactions (kN)', 'Name', 'L/D'])
+        for brg in brgs:
+            f.writerow(brg)
+
+        f.writerow('')
+        f.writerow('')
+
+        ##############################################
         csvfile.close()
     except PermissionError:
         print('Permission Error: Close output .csv file (excel maybe) before running')
-# add concentrated masses table   
-
+        
 def create_output_plots(fileprefix, output, brgs):
-    # Plots of beam output
-
     # Transpose lists for plotting
     data = list(zip(*output))
     brgs_zip = list(zip(*brgs))
@@ -396,34 +391,47 @@ def create_output_plots(fileprefix, output, brgs):
     labels = ['Deflection (mm)', 'Slope (mrad)', 'Shear Force (kN)', 'Bending Moment (kNm)', 'Bending Stress (MPa)']
     files = ['defl', 'slope', 'shear', 'moment', 'stress']
 
-    #############################################
-    # display settings for plot
+    # Bearing offsets for deflection plot
     offsets = brgs_zip[3]
+
+    #############################################
+    # Plot each
     for j in range(len(labels)):
+        
+        # display settings for plot
         plt.rcParams['figure.figsize'] = [12, 5]
         plt.rcParams['figure.autolayout'] = True
-        plt.xlim(0, output[-1][1])
+
+        # Increase x-axis limits by 2% at each end to prevent cropping        
+        length = output[-1][1]
+        plt.xlim(0-length*0.02, output[-1][1]*1.02)
         plt.xlabel('Position (m)')
+
         
-        if files[j] == 'shear':   
+        if files[j] == 'shear' or files[j] == 'moment' :   
             # Plot points
-            plt.plot(data[1], data[2+j], 'o-', color='black')
+            plt.plot(data[1], data[2+j], '', color='black')
 
         else:
             # Smooth out curve
             list_x_new = linspace(min(data[1]), max(data[1]), 1000)
-            list_y_smooth = interp1d(data[1], data[2+j], kind='cubic')
+            list_y_smooth = interp1d(data[1], data[2+j], kind='slinear')
 
             # Plot points
-            plt.plot(data[1], data[2+j], 'o', color='black')        
+            # plt.plot(data[1], data[2+j], 'o', color='black')        
 
             # Plot smooth curve
             plt.plot(list_x_new, list_y_smooth(list_x_new), '-' , color='black')
-        
+
+        #####################################################        
         # Plot bearings
         plt.plot(brgs_zip[1], offsets, '^', markersize = 15, color='red')
         plt.ylabel(labels[j])
 
+        # Add bearing names
+
+
+        ######################################################
         # Y axis lable, make larger??
         #fig.text(0.06, 0.5, 'Relative Displacement', ha='center', va='center', rotation='vertical')
 
@@ -443,20 +451,14 @@ def create_output_plots(fileprefix, output, brgs):
         offsets = [0 for x in brgs_zip[4]]
 # add bearing names
 
-def create_model_plot(filename, model, output, brgs, conc_mass):
+def create_model_plot(filename, model, output, brgs, conc_masses):
     # Plot model to image file
 
-    # Setup figure size
-    width = 10
-    height = 3
-    dpi = 100
-    scale = width*dpi*0.0125
-
-    plt.rcParams['figure.figsize'] = [width, height]
-    plt.rcParams['figure.dpi'] = dpi
+    plt.rcParams['figure.figsize'] = [10, 4]
     plt.rcParams['figure.autolayout'] = True
     fig, ax = plt.subplots()
     elements = []
+    y_max = 0
 
     ##########################################################
     # Plot element properties
@@ -467,6 +469,9 @@ def create_model_plot(filename, model, output, brgs, conc_mass):
         right = output[i+1][1]
         top = model[i][1] / 2
         bottom = -top
+
+        # save max diameter
+        if top > y_max: y_max = top
 
         # Shape to plot
         rect = [[left, top],
@@ -479,39 +484,23 @@ def create_model_plot(filename, model, output, brgs, conc_mass):
         polygon = Polygon(xy=rect, closed=True)
         elements.append(polygon)
 
+    # plot concentrated masses
+    for mass in conc_masses:
+        left = output[mass[0] - 1][1]
+        right = output[mass[0]][1]
+        top = model[mass[0] - 1][1] * 2/3
+        
+        if mass[2] > 0: 
+            ax.annotate("",
+                        xy=(left, top),
+                        xytext = (left, top + 0.25),
+                        arrowprops=dict(facecolor='blue', width = 2.5, headwidth = 7.5, headlength = 5),
+                        horizontalalignment='center', verticalalignment='top')
+
     # Assign elements to be plot and colors
     p = PatchCollection(elements, cmap=cm.jet, alpha=0.4)
     p.set_edgecolor('black')
     p.set_facecolor(None)
-
-    ##############################################################
-    # Plot concentrated masses
-    for mass in conc_mass:
-
-        # Only plot if not node 1, not zero mass, and DOF = 1 (not concentrated inertia)
-        if mass[0] != 0 and mass[2] != 0 and mass[1] == 1:
-
-            # Location of mass
-            node = mass[0]
-
-            # As long as not the last element, get larger of ODs
-            if node != len(model) - 1:
-                plt_y = max(model[node][1], model[node+1][1])
-            else:
-                plt_y = model[node][1]
-
-            # Assign concentrated masses to plot
-            ax.arrow(x = model[node][-2],
-                     y = scale / 5 * plt_y,
-                     dx = 0, dy =  -plt_y * mass[2] / abs(mass[2]) * scale / 25,
-                     width = 0.003 * scale)
-
-    #############################################################
-
-    # Assign bearings to plot
-    brg_x = [brg[1] for brg in brgs] 
-    brg_y = [-model[brg[0]-1][1] for brg in brgs]
-    ax.plot(brg_x, brg_y, '^', markersize=scale, color='red')
 
     ##############################################################
     # x-axis settings
@@ -519,12 +508,28 @@ def create_model_plot(filename, model, output, brgs, conc_mass):
     plt.xlabel('Location (m)')
 
     # y-axis settings
-    plt.ylim(-1, 1)
+    if y_max < 1: y_max = 1
+    else: y_max = 1.5 * y_max
+    
+    plt.ylim(-y_max, y_max)
     plt.ylabel('Diameter (m)')
 
+    #############################################################
+    # Assign bearings to plot
+    brg_x = [brg[1] for brg in brgs] 
+    brg_y = [-model[brg[0]-1][1] for brg in brgs]
+    ax.plot(brg_x, brg_y, '^', markersize=10, color='red')
+
+    # # Add bearing naming
+    # brg_names = [brg[5] for brg in brgs]
+    # for i, brg in enumerate(brgs):
+    #     # vertical plotting position
+    #     txt = ax.annotate(brg[5],  xy=(brg_x[i], y_max * -0.75), ha='center', size=10, color='gray', wrap=True)
+    #     txt._get_wrap_line_width = lambda : 50.
 
     ax.add_collection(p)
 
+    ###########################################################
     # save plot
     # old file was not being overwritten without os.remove
     if os.path.isfile(filename):
@@ -544,19 +549,19 @@ def create_model_plot(filename, model, output, brgs, conc_mass):
 if __name__ == "__main__":
     # read in config file
     filename = 'parser-settings.ini'
-    brg_names = read_config(filename)
+    read_config(filename)
 
     # read in SHAFT.OUT and config file
     if settings['shaft_out_location'] == '':
         filename = 'SHAFT.OUT'
     else:
         filename = settings['shaft_out_location']
-
-    model, output, brgs, inf, summary, conc_mass = read_data(filename)
+    
+    model, output, brgs, inf, summary, conc_masses = read_data(filename)
 
     # output to csv
     filename = 'parser-output.csv'
-    output_csv(filename, model, output, brgs, inf, summary, conc_mass)
+    output_csv(filename, model, output, brgs, inf, summary)
 
     # create plots
     fileprefix = 'parser-output-'
@@ -564,7 +569,7 @@ if __name__ == "__main__":
 
     # create model graphic
     filename = 'parser-model.png'
-    create_model_plot(filename, model, output, brgs, conc_mass)
+    create_model_plot(filename, model, output, brgs, conc_masses)
 
     print('Finished')
     time.sleep(2.5)
